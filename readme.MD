@@ -52,8 +52,6 @@ Un timer Pomodoro simple et élégant avec une tomate stylisée en CSS. Ce proje
 
 - Démarrer/Arrêter le Timer : Utilisez les boutons pour démarrer, mettre en pause ou arrêter le timer.
 - Configurer les Durées : Ajustez les durées de travail et de pause à l'aide des boutons + et -.
-- Suivi Visuel : La tomate change de couleur au fur et à mesure que le temps avance, offrant un retour visuel sur votre progression.
-- Notifications Sonores : Des sons sont joués à la fin des sessions de travail et de pause.
 
 ## Technologies Utilisées
 
