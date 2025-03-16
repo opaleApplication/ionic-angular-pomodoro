@@ -58,7 +58,7 @@ Un timer Pomodoro simple et élégant avec une tomate stylisée en CSS. Ce proje
 - Ionic : Pour la création de l'interface utilisateur mobile et web.
 - Angular : Pour la structure et la logique de l'application.
 - Capacitor : Pour les fonctionnalités natives, y compris les notifications sonores.
-- CSS : Pour le design et l'animation de la tomate.
+- CSS : Pour le design.
 
 ## Contribution
 
