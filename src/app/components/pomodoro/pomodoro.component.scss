@@ -1,0 +1,100 @@
+.mode-selector {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000; /* Ensure it stays on top of other elements */
+  padding: 10px;
+}
+
+.title-container {
+  position: fixed;
+  top: 50px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.pomodoro-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding-top: 120px; /* Adjust padding to account for the fixed header and title */
+  box-sizing: border-box; /* Ensure padding is included in the total height */
+}
+
+.config-banner {
+  width: 100%;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.config-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.config-item ion-label {
+  margin-bottom: 10px;
+}
+
+.button-group {
+  display: flex;
+  align-items: center;
+}
+
+.button-group ion-button {
+  --background: var(--ion-color-primary);
+  color: white;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 5px;
+}
+
+.button-group span {
+  margin: 0 10px;
+  font-size: 1.2em;
+}
+
+.tomato {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  background: url(./../../../assets/tomato.png) no-repeat center center / cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.5em;
+  transition: background 0.5s, box-shadow 0.5s;
+}
+
+.controls {
+  margin-top: 20px;
+}
+
+ion-button {
+  --border-radius: 50%;
+  margin: 0 10px;
+}
+
+ion-button[disabled] {
+  --background: var(--ion-color-medium);
+}
+
+.timer {
+  text-align: center;
+  font-weight: bold;
+}

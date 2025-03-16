@@ -1,0 +1,64 @@
+<div class="mode-selector">
+  <ion-segment [value]="currentMode" color="dark" (ionChange)="onSegmentChange($event)">
+    <ion-segment-button value="focus" (click)="selectMode('focus')">
+      Mode Focus
+    </ion-segment-button>
+    <ion-segment-button value="relax" (click)="selectMode('relax')">
+      Mode Relaxe
+    </ion-segment-button>
+    <ion-segment-button value="custom" (click)="selectMode('custom')">
+      Mode Custom
+    </ion-segment-button>
+  </ion-segment>
+</div>
+
+<div class="title-container">
+  <ion-text>
+    <h2>{{ appTitle }}</h2>
+  </ion-text>
+</div>
+
+<div class="pomodoro-container">
+  <div class="config-banner" *ngIf="isCustomMode">
+    <div class="config-item">
+      <ion-label>Temps de travail (min):</ion-label>
+      <div class="button-group">
+        <ion-button (click)="decreaseWorkTime()">
+          <ion-icon slot="icon-only" name="remove-outline"></ion-icon>
+        </ion-button>
+        <span>{{ workTime / 60 }}</span>
+        <ion-button (click)="increaseWorkTime()">
+          <ion-icon slot="icon-only" name="add"></ion-icon>
+        </ion-button>
+      </div>
+    </div>
+    <div class="config-item">
+      <ion-label>Temps de pause (min):</ion-label>
+      <div class="button-group">
+        <ion-button (click)="decreaseBreakTime()">
+          <ion-icon slot="icon-only" name="remove-outline"></ion-icon>
+        </ion-button>
+        <span>{{ breakTime / 60 }}</span>
+        <ion-button (click)="increaseBreakTime()">
+          <ion-icon slot="icon-only" name="add"></ion-icon>
+        </ion-button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tomato">
+    <div class="timer">{{ formatTime(timeLeft) }}</div>
+  </div>
+
+  <div class="controls">
+    <ion-button (click)="startTimer()" [disabled]="isRunning">
+      <ion-icon name="play"></ion-icon>
+    </ion-button>
+    <ion-button (click)="pauseTimer()" [disabled]="!isRunning">
+      <ion-icon name="pause"></ion-icon>
+    </ion-button>
+    <ion-button (click)="stopTimer()" [disabled]="!isRunning">
+      <ion-icon name="stop"></ion-icon>
+    </ion-button>
+  </div>
+</div>
