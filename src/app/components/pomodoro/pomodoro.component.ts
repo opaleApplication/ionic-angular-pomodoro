@@ -1,283 +1,365 @@
-import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 
 import { NativeAudio } from '@capgo/native-audio';
 
-import { IonIcon, IonButton, IonLabel, IonText, IonSegment, IonSegmentButton } from '@ionic/angular/standalone';
+import {
+  IonButton,
+  IonCard,
+  IonCardContent,
+  IonCardHeader,
+  IonCol,
+  IonGrid,
+  IonIcon,
+  IonItem,
+  IonLabel,
+  IonList,
+  IonNote,
+  IonProgressBar,
+  IonRow,
+  IonSegment,
+  IonSegmentButton,
+} from '@ionic/angular/standalone';
 
 import { addIcons } from 'ionicons';
-import { pause, play, stop, add, removeOutline } from 'ionicons/icons';
+import { add, pause, play, removeOutline, stop } from 'ionicons/icons';
 
-/**
- * PomodoroComponent is an Angular component that implements a Pomodoro timer.
- * It allows users to start, pause, stop, and toggle between work and break intervals.
- * The component also supports playing sounds and formatting time.
- */
+import { I18nService } from '../../core/i18n.service';
+
+type PomodoroMode = 'focus' | 'relax' | 'custom';
+type SessionPhase = 'work' | 'break';
+type TomatoLayerKey = 'green' | 'yellow' | 'red';
+
 @Component({
   selector: 'app-pomodoro',
   templateUrl: './pomodoro.component.html',
   styleUrls: ['./pomodoro.component.scss'],
-  imports: [IonSegmentButton, IonSegment, IonText, IonLabel, IonButton, IonIcon, CommonModule],
+  imports: [
+    IonButton,
+    IonCard,
+    IonCardContent,
+    IonCardHeader,
+    IonCol,
+    IonGrid,
+    IonIcon,
+    IonItem,
+    IonLabel,
+    IonList,
+    IonNote,
+    IonProgressBar,
+    IonRow,
+    IonSegment,
+    IonSegmentButton,
+  ],
   standalone: true,
 })
-export class PomodoroComponent implements OnInit {
-  /** The title of the application. */
-  appTitle: string = 'Pomodoro Timer';
+export class PomodoroComponent implements OnInit, OnDestroy {
+  readonly i18n = inject(I18nService);
+  readonly modes: readonly PomodoroMode[] = ['focus', 'relax', 'custom'];
+  readonly customPhases: readonly SessionPhase[] = ['work', 'break'];
+  readonly tomatoLayers = [
+    { key: 'green' as const, src: 'assets/tomato-green.png' },
+    { key: 'yellow' as const, src: 'assets/tomato-yellow.png' },
+    { key: 'red' as const, src: 'assets/tomato.png' },
+  ];
 
-  /** The duration of the work interval in seconds. Default is 25 minutes. */
   workTime = 25 * 60;
-
-  /** The duration of the break interval in seconds. Default is 5 minutes. */
   breakTime = 5 * 60;
-
-  /** The remaining time in the current interval in seconds. */
   timeLeft = this.workTime;
-
-  /** Indicates whether the current interval is a work interval. */
   isWorkTime = true;
-
-  /** Indicates whether the timer is currently running. */
   isRunning = false;
+  userInteracted = false;
+  currentMode: PomodoroMode = 'relax';
+  isCustomMode = false;
 
-  /** The interval ID for the timer. */
-  interval: any;
+  private readonly minute = 60;
+  private readonly presets: Record<Exclude<PomodoroMode, 'custom'>, { work: number; break: number }> = {
+    focus: { work: 50 * 60, break: 10 * 60 },
+    relax: { work: 25 * 60, break: 5 * 60 },
+  };
 
-  /** Indicates whether the sounds have been loaded. */
+  private interval: ReturnType<typeof setInterval> | undefined;
   private soundsLoaded = false;
+  private customWorkTime = this.workTime;
+  private customBreakTime = this.breakTime;
+  private readonly handleFirstInteraction = () => {
+    if (!this.soundsLoaded) {
+      this.preloadSounds();
+    }
+    this.userInteracted = true;
+  };
 
-  /** Indicates whether the user has interacted with the page. */
-  userInteracted: boolean = false;
-
-  currentMode: string = 'relax'; // Set default mode to 'relax'
-  isCustomMode: boolean = false;
-
-  /**
-   * Initialize the component.
-   *
-   * The constructor preloads the sounds using the {@link preloadSounds} method
-   * and adds the necessary icons to the DOM using the {@link addIcons} method.
-   */
   constructor() {
     addIcons({ add, play, pause, stop, removeOutline });
     this.preloadSounds();
   }
 
-  /**
-   * Event listener for the first user interaction on the document.
-   * It is used to load the sounds after the first user interaction.
-   * The event listener is removed after the first interaction.
-   */
-  ngOnInit() {
-    document.addEventListener('click', () => {
-      if (!this.soundsLoaded) {
-        this.preloadSounds();  // Charger les sons après la première interaction
-        this.soundsLoaded = true;
-      }
-      this.userInteracted = true;
-    }, { once: true }); // Exécuter une seule fois
+  ngOnInit(): void {
+    document.addEventListener('click', this.handleFirstInteraction, { once: true });
   }
 
-  /**
-   * Sets the mode of the Pomodoro timer to the given mode.
-   * Available modes are 'focus', 'relax', and 'custom'.
-   * The mode determines the duration of the work and break intervals.
-   * @param mode The mode to set the timer to.
-   */
-  selectMode(mode: string) {
+  ngOnDestroy(): void {
+    this.clearTimer();
+    document.removeEventListener('click', this.handleFirstInteraction);
+  }
+
+  get appTitle(): string {
+    return this.i18n.t('app.title');
+  }
+
+  get minuteUnit(): string {
+    return this.i18n.t('common.minuteUnit');
+  }
+
+  get progressValue(): number {
+    const totalDuration = this.getDurationForCurrentPhase();
+    if (totalDuration <= 0) {
+      return 0;
+    }
+
+    return Math.min(1, Math.max(0, 1 - this.timeLeft / totalDuration));
+  }
+
+  get canReset(): boolean {
+    return this.isRunning || this.timeLeft !== this.getDurationForCurrentPhase();
+  }
+
+  get greenTomatoOpacity(): number {
+    return this.clamp(1 - this.progressValue * 2);
+  }
+
+  get yellowTomatoOpacity(): number {
+    return this.clamp(1 - Math.abs(this.progressValue - 0.5) / 0.5);
+  }
+
+  get redTomatoOpacity(): number {
+    return this.clamp((this.progressValue - 0.5) * 2);
+  }
+
+  get shouldBlink(): boolean {
+    return this.isRunning && this.timeLeft > 0 && this.timeLeft <= 10;
+  }
+
+  get blinkDuration(): string {
+    if (!this.shouldBlink) {
+      return '0s';
+    }
+
+    const ratio = this.clamp(this.timeLeft / 10);
+    const duration = 0.18 + ratio;
+    return `${duration.toFixed(2)}s`;
+  }
+
+  selectMode(mode: PomodoroMode): void {
     this.currentMode = mode;
-    this.isCustomMode = (mode === 'custom');
-    switch (mode) {
-      case 'focus':
-        this.workTime = 50 * 60;
-        this.breakTime = 10 * 60;
-        break;
-      case 'relax':
-        this.workTime = 25 * 60;
-        this.breakTime = 5 * 60;
-        break;
-      case 'custom':
-        // Allow user to set custom times
-        break;
-      default:
-        break;
+    this.isCustomMode = mode === 'custom';
+
+    if (mode === 'custom') {
+      this.workTime = this.customWorkTime;
+      this.breakTime = this.customBreakTime;
+    } else {
+      const preset = this.presets[mode];
+      this.workTime = preset.work;
+      this.breakTime = preset.break;
     }
-    this.timeLeft = this.workTime;
+
+    this.resetToWorkSession();
   }
 
-  /**
-   * Preloads the work sound asset if it has not been loaded yet.
-   *
-   * This method attempts to load the sound asset specified by the assetId 'work_sound'
-   * from the path 'assets/sounds/work_sound.mp3'. It sets the `soundsLoaded` flag to true
-   * upon successful loading. If the asset is already loaded or an error occurs during the
-   * loading process, a warning is logged to the console with the error details.
-   */
-  preloadSounds() {
-    if (!this.soundsLoaded) {
-      try {
-        NativeAudio.preload({
-          assetId: 'work_sound',
-          assetPath: 'assets/sounds/work_sound.mp3',
-          audioChannelNum: 1,
-          isUrl: false
-        });
+  preloadSounds(): void {
+    if (this.soundsLoaded) {
+      return;
+    }
+
+    void NativeAudio.preload({
+      assetId: 'work_sound',
+      assetPath: 'assets/sounds/work_sound.mp3',
+      audioChannelNum: 1,
+      isUrl: false,
+    })
+      .then(() => {
         this.soundsLoaded = true;
-      } catch (error) {
-        console.warn('Le son est déjà chargé ou une erreur est survenue :', error);
-      }
-    }
-  }
-
-  /**
-   * Starts the timer.
-   *
-   * If the timer is not already running, sets it to running and starts
-   * a new interval that decrements the `timeLeft` property every second.
-   * If the `timeLeft` property reaches 0, the `toggleTimer` method is called
-   * to switch to the next interval.
-   */
-  startTimer() {
-    if (!this.isRunning) {
-      this.isRunning = true;
-      this.interval = setInterval(() => {
-        if (this.timeLeft > 0) {
-          this.timeLeft--;
-        } else {
-          this.toggleTimer();
+      })
+      .catch((error) => {
+        if (typeof error === 'string' && error.includes('AssetId already exists')) {
+          this.soundsLoaded = true;
+          return;
         }
-      }, 1000);
-    }
+
+        console.warn(this.i18n.t('pomodoro.audio.preloadError'), error);
+      });
   }
 
-  /**
-   * Pauses the currently running timer.
-   *
-   * If the timer is active, sets the `isRunning` property to false
-   * and clears the interval to stop the countdown.
-   */
-  pauseTimer() {
+  startTimer(): void {
     if (this.isRunning) {
-      this.isRunning = false;
-      clearInterval(this.interval);
+      return;
     }
+
+    this.isRunning = true;
+    this.interval = setInterval(() => {
+      if (this.timeLeft > 0) {
+        this.timeLeft--;
+        return;
+      }
+
+      this.toggleTimer();
+    }, 1000);
   }
 
-  /**
-   * Stops the currently running timer and resets it to the start time.
-   *
-   * If the timer is active, sets the `isRunning` property to false
-   * and clears the interval to stop the countdown. Then, it resets
-   * the `timeLeft` property to the start time of the current interval
-   * (either `workTime` or `breakTime`).
-   */
-  stopTimer() {
+  pauseTimer(): void {
+    if (!this.isRunning) {
+      return;
+    }
+
     this.isRunning = false;
-    clearInterval(this.interval);
-    this.timeLeft = this.isWorkTime ? this.workTime : this.breakTime;
+    this.clearTimer();
   }
 
-  /**
-   * Toggles the timer between work and break intervals.
-   *
-   * If the timer is currently in a work interval, it switches to a break
-   * interval. Otherwise, it switches to a work interval. It also clears the
-   * previous interval and starts a new one. If the timer was previously running,
-   * the sound associated with the new interval is played.
-   */
-  toggleTimer() {
-    clearInterval(this.interval);
-    if (this.isWorkTime) {
-      this.timeLeft = this.breakTime;
-      this.isWorkTime = false;
+  stopTimer(): void {
+    this.isRunning = false;
+    this.clearTimer();
+    this.timeLeft = this.getDurationForCurrentPhase();
+  }
+
+  toggleTimer(): void {
+    const shouldResume = this.isRunning;
+
+    this.clearTimer();
+    this.isRunning = false;
+    this.isWorkTime = !this.isWorkTime;
+    this.timeLeft = this.getDurationForCurrentPhase();
+
+    if (!this.isWorkTime) {
       this.playSound('work_sound');
-    } else {
-      this.timeLeft = this.workTime;
-      this.isWorkTime = true;
     }
-    this.startTimer();
-  }
 
-  /**
-   * Plays a sound asset.
-   *
-   * If the user has already interacted with the page (e.g. by clicking on
-   * something), the sound is played using NativeAudio. Otherwise, a warning
-   * message is logged to the console.
-   *
-   * @param assetId - The ID of the asset to play.
-   */
-  playSound(assetId: string) {
-    if (this.userInteracted) {
-      NativeAudio.play({ assetId });
-    } else {
-      console.warn('L’utilisateur doit interagir avec la page avant de jouer un son.');
+    if (shouldResume) {
+      this.startTimer();
     }
   }
 
-  /**
-   * Converts a number of seconds to a string in "mm:ss" format.
-   *
-   * @param seconds - The number of seconds to format.
-   * @returns A string in "mm:ss" format.
-   */
+  playSound(assetId: string): void {
+    if (!this.userInteracted) {
+      console.warn(this.i18n.t('pomodoro.audio.interactionRequired'));
+      return;
+    }
+
+    void NativeAudio.play({ assetId }).catch((error) => {
+      console.warn(this.i18n.t('pomodoro.audio.playError'), error);
+    });
+  }
+
   formatTime(seconds: number): string {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
-  /**
-   * Increments the work time by 60 seconds and updates the timer if the timer
-   * is currently in a work interval.
-   */
-  increaseWorkTime() {
-    this.workTime += 60;
-    if (this.isWorkTime) this.timeLeft = this.workTime;
+  getModeLabel(mode: PomodoroMode): string {
+    return this.i18n.t(`pomodoro.mode.${mode}`);
   }
 
-  /**
-   * Decrements the work time by 60 seconds if it is greater than 60 seconds.
-   * Updates the `timeLeft` property if the timer is currently in a work interval
-   * and the remaining time exceeds the new work time.
-   */
-  decreaseWorkTime() {
-    if (this.workTime > 60) {
-      this.workTime -= 60;
-      if (this.isWorkTime && this.timeLeft > this.workTime) {
-        this.timeLeft = this.workTime;
-      }
+  getPhaseLabel(phase: SessionPhase): string {
+    return this.i18n.t(`pomodoro.phase.${phase}`);
+  }
+
+  getSettingHint(phase: SessionPhase): string {
+    return this.i18n.t(`pomodoro.custom.${phase}.hint`);
+  }
+
+  getDurationMinutes(phase: SessionPhase): number {
+    return this.getPhaseDuration(phase) / this.minute;
+  }
+
+  getDurationAriaLabel(action: 'increase' | 'decrease', phase: SessionPhase): string {
+    return this.i18n.t(`pomodoro.a11y.${action}.${phase}`);
+  }
+
+  getTomatoOpacity(layer: TomatoLayerKey): number {
+    switch (layer) {
+      case 'green':
+        return this.greenTomatoOpacity;
+      case 'yellow':
+        return this.yellowTomatoOpacity;
+      case 'red':
+        return this.redTomatoOpacity;
     }
   }
 
-  /**
-   * Increments the break time by 60 seconds and updates the timer if the timer
-   * is currently in a break interval.
-   */
-  increaseBreakTime() {
-    this.breakTime += 60;
-    if (!this.isWorkTime) this.timeLeft = this.breakTime;
+  increaseDuration(phase: SessionPhase): void {
+    this.updateCustomDuration(phase, this.minute);
   }
 
-  /**
-   * Decrements the break time by 60 seconds and updates the timer if the timer
-   * is currently in a break interval.
-   */
-  decreaseBreakTime() {
-    if (this.breakTime > 60) {
-      this.breakTime -= 60;
-      if (!this.isWorkTime && this.timeLeft > this.breakTime) {
-        this.timeLeft = this.breakTime;
-      }
-    }
+  decreaseDuration(phase: SessionPhase): void {
+    this.updateCustomDuration(phase, -this.minute);
   }
 
-  /**
-   * Listens for changes in the segment and updates the mode of the Pomodoro timer.
-   * @param event CustomEvent emitted by the ion-segment when the selected segment changes.
-   * @param event.detail.value The currently selected mode.
-   */
-  onSegmentChange(event: CustomEvent) {
+  onSegmentChange(event: CustomEvent<{ value?: string | number | null }>): void {
     const selectedMode = event.detail.value;
-    this.selectMode(selectedMode);
+    if (typeof selectedMode === 'string' && this.isPomodoroMode(selectedMode)) {
+      this.selectMode(selectedMode);
+    }
+  }
+
+  private resetToWorkSession(): void {
+    this.isRunning = false;
+    this.clearTimer();
+    this.isWorkTime = true;
+    this.timeLeft = this.workTime;
+  }
+
+  private getPhaseDuration(phase: SessionPhase): number {
+    return phase === 'work' ? this.workTime : this.breakTime;
+  }
+
+  private updateCustomDuration(phase: SessionPhase, delta: number): void {
+    const currentDuration = phase === 'work' ? this.customWorkTime : this.customBreakTime;
+    const nextDuration = Math.max(this.minute, currentDuration + delta);
+
+    if (nextDuration === currentDuration) {
+      return;
+    }
+
+    if (phase === 'work') {
+      this.customWorkTime = nextDuration;
+      this.workTime = nextDuration;
+    } else {
+      this.customBreakTime = nextDuration;
+      this.breakTime = nextDuration;
+    }
+
+    const isCurrentPhase = (phase === 'work') === this.isWorkTime;
+    if (!isCurrentPhase) {
+      return;
+    }
+
+    if (!this.isRunning) {
+      this.timeLeft = nextDuration;
+      return;
+    }
+
+    if (this.timeLeft > nextDuration) {
+      this.timeLeft = nextDuration;
+    }
+  }
+
+  private getDurationForCurrentPhase(): number {
+    return this.isWorkTime ? this.workTime : this.breakTime;
+  }
+
+  private isPomodoroMode(value: string | undefined): value is PomodoroMode {
+    return value === 'focus' || value === 'relax' || value === 'custom';
+  }
+
+  private clearTimer(): void {
+    if (!this.interval) {
+      return;
+    }
+
+    clearInterval(this.interval);
+    this.interval = undefined;
+  }
+
+  private clamp(value: number, min = 0, max = 1): number {
+    return Math.min(max, Math.max(min, value));
   }
 }

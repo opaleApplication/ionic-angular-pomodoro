@@ -1,0 +1,22 @@
+{
+  "app.title": "Pomodoro Timer",
+  "common.minuteUnit": "min",
+  "pomodoro.mode.focus": "Focus",
+  "pomodoro.mode.relax": "Relax",
+  "pomodoro.mode.custom": "Perso",
+  "pomodoro.phase.work": "Travail",
+  "pomodoro.phase.break": "Pause",
+  "pomodoro.custom.work.hint": "Durée de concentration",
+  "pomodoro.custom.break.hint": "Récupération entre sessions",
+  "pomodoro.a11y.decrease.work": "Diminuer le temps de travail",
+  "pomodoro.a11y.increase.work": "Augmenter le temps de travail",
+  "pomodoro.a11y.decrease.break": "Diminuer le temps de pause",
+  "pomodoro.a11y.increase.break": "Augmenter le temps de pause",
+  "pomodoro.a11y.start": "Démarrer le minuteur",
+  "pomodoro.a11y.pause": "Mettre en pause le minuteur",
+  "pomodoro.a11y.stop": "Réinitialiser le minuteur",
+  "pomodoro.note": "Changer de mode relance une session de travail avec la duree choisie.",
+  "pomodoro.audio.interactionRequired": "L'utilisateur doit interagir avec la page avant de jouer un son.",
+  "pomodoro.audio.preloadError": "Le son n'a pas pu être charge :",
+  "pomodoro.audio.playError": "Le son n'a pas pu être joue :"
+}

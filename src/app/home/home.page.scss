@@ -1,0 +1,33 @@
+:host {
+  display: block;
+}
+
+ion-toolbar {
+  --background: rgba(6, 10, 24, 0.76);
+  --border-color: rgba(118, 186, 255, 0.14);
+  --color: #f8fbff;
+  backdrop-filter: blur(16px);
+}
+
+ion-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.home-content {
+  --background:
+    radial-gradient(circle at top, rgba(74, 168, 255, 0.16), transparent 32%),
+    linear-gradient(180deg, #060a18 0%, #02040d 100%);
+}
+
+.home-content::part(scroll) {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-grid {
+  width: 100%;
+  margin-block: auto;
+  padding: 16px;
+}

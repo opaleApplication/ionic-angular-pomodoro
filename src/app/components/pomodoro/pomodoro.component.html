@@ -1,64 +1,144 @@
-<div class="mode-selector">
-  <ion-segment [value]="currentMode" color="dark" (ionChange)="onSegmentChange($event)">
-    <ion-segment-button value="focus" (click)="selectMode('focus')">
-      Mode Focus
-    </ion-segment-button>
-    <ion-segment-button value="relax" (click)="selectMode('relax')">
-      Mode Relaxe
-    </ion-segment-button>
-    <ion-segment-button value="custom" (click)="selectMode('custom')">
-      Mode Custom
-    </ion-segment-button>
-  </ion-segment>
-</div>
+<ion-card class="pomodoro-card">
+  <ion-card-header>
+    <ion-segment
+      class="mode-segment"
+      color="secondary"
+      mode="md"
+      [value]="currentMode"
+      (ionChange)="onSegmentChange($event)"
+    >
+      @for (mode of modes; track mode) {
+        <ion-segment-button color="secondary" mode="md" [value]="mode">
+          <ion-label>{{ getModeLabel(mode) }}</ion-label>
+        </ion-segment-button>
+      }
+    </ion-segment>
+  </ion-card-header>
 
-<div class="title-container">
-  <ion-text>
-    <h2>{{ appTitle }}</h2>
-  </ion-text>
-</div>
+  <ion-card-content>
+    @if (isCustomMode) {
+      <ion-list class="custom-settings" inset="true">
+        @for (phase of customPhases; track phase) {
+          <ion-item class="custom-item" lines="none">
+            <ion-grid class="custom-grid">
+              <ion-row class="custom-copy-row">
+                <ion-col size="12">
+                  <ion-label class="custom-label ion-padding-top">
+                    <h3>{{ getPhaseLabel(phase) }}</h3>
+                    <p>{{ getSettingHint(phase) }}</p>
+                  </ion-label>
+                </ion-col>
+              </ion-row>
 
-<div class="pomodoro-container">
-  <div class="config-banner" *ngIf="isCustomMode">
-    <div class="config-item">
-      <ion-label>Temps de travail (min):</ion-label>
-      <div class="button-group">
-        <ion-button (click)="decreaseWorkTime()">
-          <ion-icon slot="icon-only" name="remove-outline"></ion-icon>
-        </ion-button>
-        <span>{{ workTime / 60 }}</span>
-        <ion-button (click)="increaseWorkTime()">
-          <ion-icon slot="icon-only" name="add"></ion-icon>
-        </ion-button>
-      </div>
-    </div>
-    <div class="config-item">
-      <ion-label>Temps de pause (min):</ion-label>
-      <div class="button-group">
-        <ion-button (click)="decreaseBreakTime()">
-          <ion-icon slot="icon-only" name="remove-outline"></ion-icon>
-        </ion-button>
-        <span>{{ breakTime / 60 }}</span>
-        <ion-button (click)="increaseBreakTime()">
-          <ion-icon slot="icon-only" name="add"></ion-icon>
-        </ion-button>
-      </div>
-    </div>
-  </div>
+              <ion-row class="custom-stepper-row ion-align-items-center ion-justify-content-center ion-padding-bottom">
+                <ion-col class="stepper-action-col" size="3">
+                  <ion-button
+                    class="neon-stepper"
+                    fill="outline"
+                    shape="round"
+                    [attr.aria-label]="getDurationAriaLabel('decrease', phase)"
+                    (click)="decreaseDuration(phase)"
+                  >
+                    <ion-icon slot="icon-only" name="remove-outline"></ion-icon>
+                  </ion-button>
+                </ion-col>
 
-  <div class="tomato">
-    <div class="timer">{{ formatTime(timeLeft) }}</div>
-  </div>
+                <ion-col class="stepper-value-col" size="6">
+                  <ion-label class="duration-value">{{ getDurationMinutes(phase) }} {{ minuteUnit }}</ion-label>
+                </ion-col>
 
-  <div class="controls">
-    <ion-button (click)="startTimer()" [disabled]="isRunning">
-      <ion-icon name="play"></ion-icon>
-    </ion-button>
-    <ion-button (click)="pauseTimer()" [disabled]="!isRunning">
-      <ion-icon name="pause"></ion-icon>
-    </ion-button>
-    <ion-button (click)="stopTimer()" [disabled]="!isRunning">
-      <ion-icon name="stop"></ion-icon>
-    </ion-button>
-  </div>
-</div>
+                <ion-col class="stepper-action-col" size="3">
+                  <ion-button
+                    class="neon-stepper"
+                    fill="outline"
+                    shape="round"
+                    [attr.aria-label]="getDurationAriaLabel('increase', phase)"
+                    (click)="increaseDuration(phase)"
+                  >
+                    <ion-icon slot="icon-only" name="add"></ion-icon>
+                  </ion-button>
+                </ion-col>
+              </ion-row>
+            </ion-grid>
+          </ion-item>
+        }
+      </ion-list>
+    }
+
+    <ion-grid class="timer-grid">
+      <ion-row class="ion-justify-content-center">
+        <ion-col size="12">
+          <div
+            class="tomato-stage"
+            [class.is-blinking]="shouldBlink"
+            [style.--blink-duration]="blinkDuration"
+          >
+            @for (layer of tomatoLayers; track layer.key) {
+              <img
+                class="tomato-layer"
+                [class.is-active]="getTomatoOpacity(layer.key) > 0.02"
+                [src]="layer.src"
+                [style.opacity]="getTomatoOpacity(layer.key)"
+                [alt]="appTitle"
+              />
+            }
+
+            <div class="timer-readout">{{ formatTime(timeLeft) }}</div>
+          </div>
+        </ion-col>
+      </ion-row>
+
+      <ion-row>
+        <ion-col size="12">
+          <ion-progress-bar class="progress-bar" [value]="progressValue"></ion-progress-bar>
+        </ion-col>
+      </ion-row>
+
+      <ion-row class="controls-row">
+        <ion-col size="4">
+          <ion-button
+            class="neon-control neon-control--play"
+            expand="block"
+            fill="outline"
+            shape="round"
+            [attr.aria-label]="i18n.t('pomodoro.a11y.start')"
+            [disabled]="isRunning"
+            (click)="startTimer()"
+          >
+            <ion-icon slot="icon-only" name="play"></ion-icon>
+          </ion-button>
+        </ion-col>
+
+        <ion-col size="4">
+          <ion-button
+            class="neon-control neon-control--pause"
+            expand="block"
+            fill="outline"
+            shape="round"
+            [attr.aria-label]="i18n.t('pomodoro.a11y.pause')"
+            [disabled]="!isRunning"
+            (click)="pauseTimer()"
+          >
+            <ion-icon slot="icon-only" name="pause"></ion-icon>
+          </ion-button>
+        </ion-col>
+
+        <ion-col size="4">
+          <ion-button
+            class="neon-control neon-control--stop"
+            expand="block"
+            fill="outline"
+            shape="round"
+            [attr.aria-label]="i18n.t('pomodoro.a11y.stop')"
+            [disabled]="!canReset"
+            (click)="stopTimer()"
+          >
+            <ion-icon slot="icon-only" name="stop"></ion-icon>
+          </ion-button>
+        </ion-col>
+      </ion-row>
+    </ion-grid>
+
+    <ion-note class="status-note">{{ i18n.t('pomodoro.note') }}</ion-note>
+  </ion-card-content>
+</ion-card>

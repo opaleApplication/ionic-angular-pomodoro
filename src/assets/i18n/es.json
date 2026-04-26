@@ -1,0 +1,22 @@
+{
+  "app.title": "Temporizador Pomodoro",
+  "common.minuteUnit": "min",
+  "pomodoro.mode.focus": "Enfoque",
+  "pomodoro.mode.relax": "Relax",
+  "pomodoro.mode.custom": "Personal",
+  "pomodoro.phase.work": "Trabajo",
+  "pomodoro.phase.break": "Pausa",
+  "pomodoro.custom.work.hint": "Duracion de concentracion",
+  "pomodoro.custom.break.hint": "Recuperacion entre sesiones",
+  "pomodoro.a11y.decrease.work": "Reducir tiempo de trabajo",
+  "pomodoro.a11y.increase.work": "Aumentar tiempo de trabajo",
+  "pomodoro.a11y.decrease.break": "Reducir tiempo de pausa",
+  "pomodoro.a11y.increase.break": "Aumentar tiempo de pausa",
+  "pomodoro.a11y.start": "Iniciar temporizador",
+  "pomodoro.a11y.pause": "Pausar temporizador",
+  "pomodoro.a11y.stop": "Reiniciar temporizador",
+  "pomodoro.note": "Cambiar de modo reinicia una sesion de trabajo con la duracion elegida.",
+  "pomodoro.audio.interactionRequired": "El usuario debe interactuar con la pagina antes de reproducir audio.",
+  "pomodoro.audio.preloadError": "No se pudo precargar el sonido:",
+  "pomodoro.audio.playError": "No se pudo reproducir el sonido:"
+}

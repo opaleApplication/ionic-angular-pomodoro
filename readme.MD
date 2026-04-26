@@ -1,77 +1,65 @@
 # Pomodoro Timer
 
-Un timer Pomodoro simple et élégant avec une tomate stylisée en CSS. Ce projet utilise Ionic et Angular pour créer une interface utilisateur attrayante et fonctionnelle.
+Application Pomodoro mobile-first construite avec Ionic 8, Angular 20 et Capacitor 8.
 
-## Logo
-
-<div style="text-align: center;">
-  <img src="src/assets/tomato.png" alt="Description de l'image" width="128" height="128">
-</div>
-
-## Capture
-
-![Description de l'image](screens/screenshot.png)
+![Capture de l'application](screens/screenshot.png)
 
 ## Fonctionnalités
 
-- **Timer Pomodoro** : Suivez vos sessions de travail et de pause avec un timer visuel.
-- **Configuration Personnalisée** : Ajustez la durée des sessions de travail et de pause selon vos besoins.
-- **Design Réaliste** : Une tomate stylisée avec des feuilles pour un look attrayant et réaliste.
+- Modes `Focus`, `Relax` et `Custom`
+- Durées de travail et de pause personnalisables
+- Traductions `fr`, `en` et `es` chargées selon la langue du mobile
+- Tomate évolutive `vert -> jaune -> rouge` avec clignotement dans les 10 dernières secondes
+- Audio natif via `@capgo/native-audio`
+- Interface Ionic responsive avec style néon
 
-## Installation
+## Stack
 
-1. **Clonez le dépôt** :
+- Angular 20
+- Ionic Angular 8
+- Capacitor 8
+- Jasmine + Karma pour les tests unitaires
 
-   ```bash
-   git clone https://github.com/votre-utilisateur/pomodoro-timer.git
-   cd pomodoro-timer
-   ```
+## Démarrage
 
-2. Installez les dépendances :
+```bash
+npm install
+npm start
+```
 
-   ```bash
-   npm install
-   ```
+L'application est ensuite disponible sur `http://localhost:4200/`.
 
-3. Installer Capacitor :
+## Commandes utiles
 
-   ```bash
-   npm install @capacitor/core @capacitor/cli
-   npx cap init
-   npx cap add native-audio
-   npx cap sync
-   ```
+```bash
+npm run build
+npx ng test --watch=false --browsers=ChromeHeadless
+npm run lint
+```
 
-4. Lancez l'application :
+## Mobile
 
-   ```bash
-   ionic serve
-   ```
+Synchroniser les plateformes natives après une modification web ou Capacitor :
 
-## Utilisation
+```bash
+npx cap sync
+```
 
-- Démarrer/Arrêter le Timer : Utilisez les boutons pour démarrer, mettre en pause ou arrêter le timer.
-- Configurer les Durées : Ajustez les durées de travail et de pause à l'aide des boutons + et -.
+Ouvrir les projets natifs :
 
-## Technologies Utilisées
+```bash
+npx cap open android
+npx cap open ios
+```
 
-- Ionic : Pour la création de l'interface utilisateur mobile et web.
-- Angular : Pour la structure et la logique de l'application.
-- Capacitor : Pour les fonctionnalités natives, y compris les notifications sonores.
-- CSS : Pour le design.
+## Traductions
 
-## Contribution
+Les fichiers de traduction se trouvent dans `src/assets/i18n/` :
 
-Les contributions sont les bienvenues ! 
-
-- Fork le projet.
-- Créez une branche pour votre fonctionnalité (git checkout -b feature/nouvelle-fonctionnalite).
-- Committez vos modifications (git commit -am 'Ajout d'une nouvelle fonctionnalité').
-- Poussez vers la branche (git push origin feature/nouvelle-fonctionnalite).
-- Créez une Pull Request.
+- `fr.json`
+- `en.json`
+- `es.json`
 
 ## Licence
 
-Ce projet est sous licence MIT. Voir le fichier LICENSE pour plus de détails.
-
-Merci d'utiliser le Pomodoro Timer ! Si vous avez des questions ou des suggestions, n'hésitez pas à ouvrir une issue ou à contacter le mainteneur du projet.
+Projet sous licence MIT. Voir `LICENSE`.

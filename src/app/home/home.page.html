@@ -1,5 +1,15 @@
-<ion-content [fullscreen]="true">
- 
-    <app-pomodoro></app-pomodoro>
+<ion-header translucent="true">
+  <ion-toolbar>
+    <ion-title>{{ i18n.t('app.title') }}</ion-title>
+  </ion-toolbar>
+</ion-header>
 
+<ion-content class="home-content" [fullscreen]="true">
+  <ion-grid class="home-grid">
+    <ion-row class="ion-justify-content-center ion-align-items-center">
+      <ion-col size="12" size-md="10" size-lg="8">
+        <app-pomodoro></app-pomodoro>
+      </ion-col>
+    </ion-row>
+  </ion-grid>
 </ion-content>

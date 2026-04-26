@@ -1,15 +1,24 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 
-import { IonContent } from '@ionic/angular/standalone';
+import {
+  IonCol,
+  IonContent,
+  IonGrid,
+  IonHeader,
+  IonRow,
+  IonTitle,
+  IonToolbar,
+} from '@ionic/angular/standalone';
 
 import { PomodoroComponent } from '../components/pomodoro/pomodoro.component';
+import { I18nService } from '../core/i18n.service';
 
 @Component({
   selector: 'app-home',
   templateUrl: 'home.page.html',
   styleUrls: ['home.page.scss'],
-  imports: [ IonContent, PomodoroComponent],
+  imports: [IonCol, IonContent, IonGrid, IonHeader, IonRow, IonTitle, IonToolbar, PomodoroComponent],
 })
 export class HomePage {
-  constructor() { }
+  readonly i18n = inject(I18nService);
 }
