@@ -24,6 +24,8 @@ ion-card-header {
 .mode-segment {
   --background: rgba(6, 10, 25, 0.78);
   --border-radius: 18px;
+  --pomodoro-segment-color: rgba(240, 246, 255, 0.78);
+  --pomodoro-segment-color-active: var(--ion-color-secondary);
   padding: 4px;
   border: 1px solid rgba(var(--ion-color-secondary-rgb), 0.22);
   box-shadow:
@@ -32,13 +34,16 @@ ion-card-header {
 }
 
 .mode-segment ion-segment-button {
-  --color: rgba(var(--ion-color-secondary-rgb), 0.6);
-  --color-checked: var(--ion-color-secondary);
+  --ion-text-color-rgb: 240, 246, 255;
+  --color: var(--pomodoro-segment-color);
+  --color-hover: #f8fbff;
+  --color-focused: #f8fbff;
+  --color-checked: var(--pomodoro-segment-color-active);
   --background-hover: rgba(var(--ion-color-secondary-rgb), 0.08);
   --background-focused: rgba(var(--ion-color-secondary-rgb), 0.12);
   --background-hover-opacity: 1;
   --background-focused-opacity: 1;
-  --indicator-color: var(--ion-color-secondary);
+  --indicator-color: var(--pomodoro-segment-color-active);
   --indicator-height: 2px;
   --indicator-box-shadow: 0 0 12px rgba(var(--ion-color-secondary-rgb), 0.34);
   min-height: 46px;
@@ -46,8 +51,20 @@ ion-card-header {
   letter-spacing: 0.04em;
 }
 
+.mode-segment ion-segment-button::part(native) {
+  color: var(--pomodoro-segment-color);
+}
+
+.mode-segment ion-segment-button.segment-button-checked::part(native) {
+  color: var(--pomodoro-segment-color-active);
+}
+
 .mode-segment ion-segment-button::part(indicator-background) {
   border-radius: 999px;
+}
+
+.mode-segment ion-segment-button ion-label {
+  color: inherit;
 }
 
 .custom-settings {
