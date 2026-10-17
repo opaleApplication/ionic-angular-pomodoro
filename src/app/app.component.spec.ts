@@ -23,7 +23,7 @@ describe('AppComponent', () => {
     }).compileComponents();
 
     const fixture = TestBed.createComponent(AppComponent);
-    fixture.detectChanges();
+    await fixture.whenStable();
 
     expect(fixture.nativeElement.querySelector('ion-app')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('ion-router-outlet')).not.toBeNull();

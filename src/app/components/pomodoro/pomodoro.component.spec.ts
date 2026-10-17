@@ -1,8 +1,8 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { NativeAudio } from '@capgo/native-audio';
 
-import { IonicModule } from '@ionic/angular';
+import { provideIonicAngular } from '@ionic/angular';
 
 import { I18nService } from '../../core/i18n.service';
 import { i18nTestingStub } from '../../../testing/i18n-test.stub';
@@ -18,17 +18,21 @@ describe('PomodoroComponent', () => {
     spyOn(console, 'warn');
 
     await TestBed.configureTestingModule({
-      imports: [IonicModule.forRoot(), PomodoroComponent],
-      providers: [{ provide: I18nService, useValue: i18nTestingStub }],
+      imports: [PomodoroComponent],
+      providers: [
+        provideIonicAngular(),
+        { provide: I18nService, useValue: i18nTestingStub },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(PomodoroComponent);
     component = fixture.componentInstance;
-    fixture.detectChanges();
+    await fixture.whenStable();
   });
 
   afterEach(() => {
     component.ngOnDestroy();
+    jasmine.clock().uninstall();
   });
 
   it('should create', () => {
@@ -36,9 +40,9 @@ describe('PomodoroComponent', () => {
   });
 
   it('should initialize with default work and break times', () => {
-    expect(component.workTime).toBe(25 * 60);
-    expect(component.breakTime).toBe(5 * 60);
-    expect(component.timeLeft).toBe(component.workTime);
+    expect(component.workTime()).toBe(25 * 60);
+    expect(component.breakTime()).toBe(5 * 60);
+    expect(component.timeLeft()).toBe(component.workTime());
   });
 
   it('should expose translated helpers', () => {
@@ -48,33 +52,47 @@ describe('PomodoroComponent', () => {
     expect(component.getPhaseLabel('work')).toBe('Work');
   });
 
-  it('should start the timer when startTimer is called', fakeAsync(() => {
+  it('should start the timer when startTimer is called', () => {
+    jasmine.clock().install();
     component.startTimer();
 
-    expect(component.isRunning).toBeTrue();
+    expect(component.isRunning()).toBeTrue();
 
-    tick(1000);
+    jasmine.clock().tick(1000);
 
-    expect(component.timeLeft).toBe(component.workTime - 1);
-  }));
+    expect(component.timeLeft()).toBe(component.workTime() - 1);
+  });
+
+  it('should refresh the rendered countdown after an asynchronous timer tick', async () => {
+    component.startTimer();
+    await fixture.whenStable();
+
+    await new Promise<void>(resolve => setTimeout(resolve, 1100));
+    await fixture.whenStable();
+
+    expect(component.timeLeft()).toBeLessThan(component.workTime());
+    expect(fixture.nativeElement.querySelector('.timer-readout').textContent.trim())
+      .toBe(component.formatTime(component.timeLeft()));
+    component.pauseTimer();
+  });
 
   it('should pause the timer when pauseTimer is called', () => {
     component.startTimer();
 
     component.pauseTimer();
 
-    expect(component.isRunning).toBeFalse();
+    expect(component.isRunning()).toBeFalse();
   });
 
   it('should reset to the current session duration when stopTimer is called', () => {
     component.startTimer();
     component.pauseTimer();
-    component.timeLeft = component.workTime - 42;
+    component.timeLeft.set(component.workTime() - 42);
 
     component.stopTimer();
 
-    expect(component.isRunning).toBeFalse();
-    expect(component.timeLeft).toBe(component.workTime);
+    expect(component.isRunning()).toBeFalse();
+    expect(component.timeLeft()).toBe(component.workTime());
   });
 
   it('should use the custom break duration when toggling from work to break', () => {
@@ -84,36 +102,37 @@ describe('PomodoroComponent', () => {
 
     component.toggleTimer();
 
-    expect(component.isWorkTime).toBeFalse();
-    expect(component.breakTime).toBe(7 * 60);
-    expect(component.timeLeft).toBe(7 * 60);
-    expect(component.isRunning).toBeFalse();
+    expect(component.isWorkTime()).toBeFalse();
+    expect(component.breakTime()).toBe(7 * 60);
+    expect(component.timeLeft()).toBe(7 * 60);
+    expect(component.isRunning()).toBeFalse();
   });
 
-  it('should continue running with the custom break duration when the work session ends', fakeAsync(() => {
+  it('should continue running with the custom break duration when the work session ends', () => {
+    jasmine.clock().install();
     component.selectMode('custom');
     component.increaseDuration('break');
     component.increaseDuration('break');
     component.startTimer();
-    component.timeLeft = 0;
+    component.timeLeft.set(0);
 
-    tick(1000);
+    jasmine.clock().tick(1000);
 
-    expect(component.isWorkTime).toBeFalse();
-    expect(component.breakTime).toBe(7 * 60);
-    expect(component.timeLeft).toBe(7 * 60);
-    expect(component.isRunning).toBeTrue();
-  }));
+    expect(component.isWorkTime()).toBeFalse();
+    expect(component.breakTime()).toBe(7 * 60);
+    expect(component.timeLeft()).toBe(7 * 60);
+    expect(component.isRunning()).toBeTrue();
+  });
 
   it('should reset to a work session when switching modes during a break', () => {
     component.toggleTimer();
-    expect(component.isWorkTime).toBeFalse();
+    expect(component.isWorkTime()).toBeFalse();
 
     component.selectMode('custom');
 
-    expect(component.isRunning).toBeFalse();
-    expect(component.isWorkTime).toBeTrue();
-    expect(component.timeLeft).toBe(component.workTime);
+    expect(component.isRunning()).toBeFalse();
+    expect(component.isWorkTime()).toBeTrue();
+    expect(component.timeLeft()).toBe(component.workTime());
   });
 
   it('should preserve custom durations when leaving and returning to custom mode', () => {
@@ -124,14 +143,14 @@ describe('PomodoroComponent', () => {
     component.selectMode('focus');
     component.selectMode('custom');
 
-    expect(component.workTime).toBe(26 * 60);
-    expect(component.breakTime).toBe(6 * 60);
-    expect(component.timeLeft).toBe(component.workTime);
+    expect(component.workTime()).toBe(26 * 60);
+    expect(component.breakTime()).toBe(6 * 60);
+    expect(component.timeLeft()).toBe(component.workTime());
   });
 
-  it('should render translated custom settings with Ionic items when custom mode is selected', () => {
+  it('should render translated custom settings with Ionic items when custom mode is selected', async () => {
     component.selectMode('custom');
-    fixture.detectChanges();
+    await fixture.whenStable();
 
     const items = fixture.nativeElement.querySelectorAll('.custom-settings ion-item');
     const content = fixture.nativeElement.textContent;
@@ -168,11 +187,11 @@ describe('PomodoroComponent', () => {
     expect(component.getTomatoOpacity('red')).toBe(0);
     expect(component.shouldBlink).toBeFalse();
 
-    component.isRunning = true;
-    component.timeLeft = 10;
+    component.isRunning.set(true);
+    component.timeLeft.set(10);
     const slowBlink = parseFloat(component.blinkDuration);
 
-    component.timeLeft = 2;
+    component.timeLeft.set(2);
     const fastBlink = parseFloat(component.blinkDuration);
 
     expect(component.shouldBlink).toBeTrue();
@@ -209,9 +228,9 @@ describe('PomodoroComponent', () => {
     expect(content).not.toContain('Mode Relaxe');
   });
 
-  it('should render neon outline custom steppers in custom mode', () => {
+  it('should render neon outline custom steppers in custom mode', async () => {
     component.selectMode('custom');
-    fixture.detectChanges();
+    await fixture.whenStable();
 
     const steppers = Array.from(
       fixture.nativeElement.querySelectorAll('.custom-settings ion-button'),

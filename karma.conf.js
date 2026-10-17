@@ -1,19 +1,18 @@
 module.exports = function (config) {
   config.set({
     basePath: '',
-    frameworks: ['jasmine', '@angular-devkit/build-angular'],
+    frameworks: ['jasmine'],
     plugins: [
       require('karma-jasmine'),
       require('karma-chrome-launcher'),
       require('karma-jasmine-html-reporter'),
-      require('karma-coverage'),
-      require('@angular-devkit/build-angular/plugins/karma')
+      require('karma-coverage')
     ],
     client: {
-      clearContext: false // Laisse les résultats visibles dans le navigateur
+      clearContext: false
     },
     jasmineHtmlReporter: {
-      suppressAll: true // Supprime les traces dupliquées
+      suppressAll: true
     },
     coverageReporter: {
       dir: require('path').join(__dirname, './coverage/app'),
@@ -26,7 +25,7 @@ module.exports = function (config) {
     reporters: ['progress', 'kjhtml'],
     port: 9876,
     colors: true,
-    logLevel: config.LOG_DEBUG, // Active le niveau de log DEBUG pour plus de détails
+    logLevel: config.LOG_INFO,
     autoWatch: true,
     browsers: ['Chrome'],
     singleRun: false,

@@ -8,7 +8,7 @@ import {
   IonRow,
   IonTitle,
   IonToolbar,
-} from '@ionic/angular/standalone';
+} from '@ionic/angular';
 
 import { PomodoroComponent } from '../components/pomodoro/pomodoro.component';
 import { I18nService } from '../core/i18n.service';

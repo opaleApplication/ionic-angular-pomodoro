@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 
 import { NativeAudio } from '@capgo/native-audio';
 
@@ -18,7 +18,7 @@ import {
   IonRow,
   IonSegment,
   IonSegmentButton,
-} from '@ionic/angular/standalone';
+} from '@ionic/angular';
 
 import { addIcons } from 'ionicons';
 import { add, pause, play, removeOutline, stop } from 'ionicons/icons';
@@ -62,14 +62,14 @@ export class PomodoroComponent implements OnInit, OnDestroy {
     { key: 'red' as const, src: 'assets/tomato.png' },
   ];
 
-  workTime = 25 * 60;
-  breakTime = 5 * 60;
-  timeLeft = this.workTime;
-  isWorkTime = true;
-  isRunning = false;
+  readonly workTime = signal(25 * 60);
+  readonly breakTime = signal(5 * 60);
+  readonly timeLeft = signal(this.workTime());
+  readonly isWorkTime = signal(true);
+  readonly isRunning = signal(false);
+  readonly currentMode = signal<PomodoroMode>('relax');
+  readonly isCustomMode = computed(() => this.currentMode() === 'custom');
   userInteracted = false;
-  currentMode: PomodoroMode = 'relax';
-  isCustomMode = false;
 
   private readonly minute = 60;
   private readonly presets: Record<Exclude<PomodoroMode, 'custom'>, { work: number; break: number }> = {
@@ -79,8 +79,8 @@ export class PomodoroComponent implements OnInit, OnDestroy {
 
   private interval: ReturnType<typeof setInterval> | undefined;
   private soundsLoaded = false;
-  private customWorkTime = this.workTime;
-  private customBreakTime = this.breakTime;
+  private customWorkTime = this.workTime();
+  private customBreakTime = this.breakTime();
   private readonly handleFirstInteraction = () => {
     if (!this.soundsLoaded) {
       this.preloadSounds();
@@ -116,11 +116,11 @@ export class PomodoroComponent implements OnInit, OnDestroy {
       return 0;
     }
 
-    return Math.min(1, Math.max(0, 1 - this.timeLeft / totalDuration));
+    return Math.min(1, Math.max(0, 1 - this.timeLeft() / totalDuration));
   }
 
   get canReset(): boolean {
-    return this.isRunning || this.timeLeft !== this.getDurationForCurrentPhase();
+    return this.isRunning() || this.timeLeft() !== this.getDurationForCurrentPhase();
   }
 
   get greenTomatoOpacity(): number {
@@ -136,7 +136,7 @@ export class PomodoroComponent implements OnInit, OnDestroy {
   }
 
   get shouldBlink(): boolean {
-    return this.isRunning && this.timeLeft > 0 && this.timeLeft <= 10;
+    return this.isRunning() && this.timeLeft() > 0 && this.timeLeft() <= 10;
   }
 
   get blinkDuration(): string {
@@ -144,22 +144,21 @@ export class PomodoroComponent implements OnInit, OnDestroy {
       return '0s';
     }
 
-    const ratio = this.clamp(this.timeLeft / 10);
+    const ratio = this.clamp(this.timeLeft() / 10);
     const duration = 0.18 + ratio;
     return `${duration.toFixed(2)}s`;
   }
 
   selectMode(mode: PomodoroMode): void {
-    this.currentMode = mode;
-    this.isCustomMode = mode === 'custom';
+    this.currentMode.set(mode);
 
     if (mode === 'custom') {
-      this.workTime = this.customWorkTime;
-      this.breakTime = this.customBreakTime;
+      this.workTime.set(this.customWorkTime);
+      this.breakTime.set(this.customBreakTime);
     } else {
       const preset = this.presets[mode];
-      this.workTime = preset.work;
-      this.breakTime = preset.break;
+      this.workTime.set(preset.work);
+      this.breakTime.set(preset.break);
     }
 
     this.resetToWorkSession();
@@ -190,14 +189,14 @@ export class PomodoroComponent implements OnInit, OnDestroy {
   }
 
   startTimer(): void {
-    if (this.isRunning) {
+    if (this.isRunning()) {
       return;
     }
 
-    this.isRunning = true;
+    this.isRunning.set(true);
     this.interval = setInterval(() => {
-      if (this.timeLeft > 0) {
-        this.timeLeft--;
+      if (this.timeLeft() > 0) {
+        this.timeLeft.update(seconds => seconds - 1);
         return;
       }
 
@@ -206,29 +205,29 @@ export class PomodoroComponent implements OnInit, OnDestroy {
   }
 
   pauseTimer(): void {
-    if (!this.isRunning) {
+    if (!this.isRunning()) {
       return;
     }
 
-    this.isRunning = false;
+    this.isRunning.set(false);
     this.clearTimer();
   }
 
   stopTimer(): void {
-    this.isRunning = false;
+    this.isRunning.set(false);
     this.clearTimer();
-    this.timeLeft = this.getDurationForCurrentPhase();
+    this.timeLeft.set(this.getDurationForCurrentPhase());
   }
 
   toggleTimer(): void {
-    const shouldResume = this.isRunning;
+    const shouldResume = this.isRunning();
 
     this.clearTimer();
-    this.isRunning = false;
-    this.isWorkTime = !this.isWorkTime;
-    this.timeLeft = this.getDurationForCurrentPhase();
+    this.isRunning.set(false);
+    this.isWorkTime.update(isWorkTime => !isWorkTime);
+    this.timeLeft.set(this.getDurationForCurrentPhase());
 
-    if (!this.isWorkTime) {
+    if (!this.isWorkTime()) {
       this.playSound('work_sound');
     }
 
@@ -301,14 +300,14 @@ export class PomodoroComponent implements OnInit, OnDestroy {
   }
 
   private resetToWorkSession(): void {
-    this.isRunning = false;
+    this.isRunning.set(false);
     this.clearTimer();
-    this.isWorkTime = true;
-    this.timeLeft = this.workTime;
+    this.isWorkTime.set(true);
+    this.timeLeft.set(this.workTime());
   }
 
   private getPhaseDuration(phase: SessionPhase): number {
-    return phase === 'work' ? this.workTime : this.breakTime;
+    return phase === 'work' ? this.workTime() : this.breakTime();
   }
 
   private updateCustomDuration(phase: SessionPhase, delta: number): void {
@@ -321,29 +320,29 @@ export class PomodoroComponent implements OnInit, OnDestroy {
 
     if (phase === 'work') {
       this.customWorkTime = nextDuration;
-      this.workTime = nextDuration;
+      this.workTime.set(nextDuration);
     } else {
       this.customBreakTime = nextDuration;
-      this.breakTime = nextDuration;
+      this.breakTime.set(nextDuration);
     }
 
-    const isCurrentPhase = (phase === 'work') === this.isWorkTime;
+    const isCurrentPhase = (phase === 'work') === this.isWorkTime();
     if (!isCurrentPhase) {
       return;
     }
 
-    if (!this.isRunning) {
-      this.timeLeft = nextDuration;
+    if (!this.isRunning()) {
+      this.timeLeft.set(nextDuration);
       return;
     }
 
-    if (this.timeLeft > nextDuration) {
-      this.timeLeft = nextDuration;
+    if (this.timeLeft() > nextDuration) {
+      this.timeLeft.set(nextDuration);
     }
   }
 
   private getDurationForCurrentPhase(): number {
-    return this.isWorkTime ? this.workTime : this.breakTime;
+    return this.isWorkTime() ? this.workTime() : this.breakTime();
   }
 
   private isPomodoroMode(value: string | undefined): value is PomodoroMode {
