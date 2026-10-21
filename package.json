@@ -66,5 +66,12 @@
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
     "typescript": "~6.0.3"
-  }
+  },
+  "browserslist": [
+    "Chrome >=119",
+    "Firefox >=119",
+    "Edge >=119",
+    "Safari >=17",
+    "iOS >=17"
+  ]
 }
