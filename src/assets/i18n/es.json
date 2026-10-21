@@ -18,5 +18,10 @@
   "pomodoro.note": "Cambiar de modo reinicia una sesion de trabajo con la duracion elegida.",
   "pomodoro.audio.interactionRequired": "El usuario debe interactuar con la pagina antes de reproducir audio.",
   "pomodoro.audio.preloadError": "No se pudo precargar el sonido:",
-  "pomodoro.audio.playError": "No se pudo reproducir el sonido:"
+  "pomodoro.audio.playError": "No se pudo reproducir el sonido:",
+  "pomodoro.notification.work": "Sesión de concentración terminada. Es hora de descansar.",
+  "pomodoro.notification.break": "Pausa terminada. Es hora de concentrarse.",
+  "pomodoro.notification.scheduleError": "No se pudo programar la notificación:",
+  "pomodoro.notification.cancelError": "No se pudo cancelar la notificación:",
+  "pomodoro.persistence.saveError": "No se pudo guardar el estado del temporizador:"
 }

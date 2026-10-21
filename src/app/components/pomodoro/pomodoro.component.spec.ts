@@ -1,10 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { NativeAudio } from '@capgo/native-audio';
-
 import { provideIonicAngular } from '@ionic/angular';
 
 import { I18nService } from '../../core/i18n.service';
+import { PomodoroAudioService } from '../../core/pomodoro-audio.service';
 import { i18nTestingStub } from '../../../testing/i18n-test.stub';
 import { PomodoroComponent } from './pomodoro.component';
 
@@ -13,8 +12,7 @@ describe('PomodoroComponent', () => {
   let fixture: ComponentFixture<PomodoroComponent>;
 
   beforeEach(async () => {
-    spyOn(NativeAudio, 'preload').and.returnValue(Promise.resolve());
-    spyOn(NativeAudio, 'play').and.returnValue(Promise.resolve());
+    localStorage.removeItem('pomodoro-state-v1');
     spyOn(console, 'warn');
 
     await TestBed.configureTestingModule({
@@ -22,6 +20,14 @@ describe('PomodoroComponent', () => {
       providers: [
         provideIonicAngular(),
         { provide: I18nService, useValue: i18nTestingStub },
+        {
+          provide: PomodoroAudioService,
+          useValue: {
+            preload: () => Promise.resolve(true),
+            registerUserInteraction: () => undefined,
+            play: () => Promise.resolve('played'),
+          },
+        },
       ],
     }).compileComponents();
 
@@ -31,7 +37,7 @@ describe('PomodoroComponent', () => {
   });
 
   afterEach(() => {
-    component.ngOnDestroy();
+    fixture.destroy();
     jasmine.clock().uninstall();
   });
 
@@ -54,13 +60,106 @@ describe('PomodoroComponent', () => {
 
   it('should start the timer when startTimer is called', () => {
     jasmine.clock().install();
+    let now = 1_000;
+    spyOn(Date, 'now').and.callFake(() => now);
     component.startTimer();
 
     expect(component.isRunning()).toBeTrue();
 
-    jasmine.clock().tick(1000);
+    now += 1_000;
+    jasmine.clock().tick(250);
 
     expect(component.timeLeft()).toBe(component.workTime() - 1);
+  });
+
+  it('should derive the countdown from the deadline after a delayed interval', () => {
+    jasmine.clock().install();
+    let now = 1_000;
+    spyOn(Date, 'now').and.callFake(() => now);
+    component.startTimer();
+
+    now += 5 * 60 * 1000;
+    jasmine.clock().tick(250);
+
+    expect(component.timeLeft()).toBe(component.workTime() - 5 * 60);
+  });
+
+  it('should catch up every elapsed phase after a long suspension', () => {
+    jasmine.clock().install();
+    let now = 1_000;
+    spyOn(Date, 'now').and.callFake(() => now);
+    component.startTimer();
+
+    now += 33 * 60 * 1000;
+    jasmine.clock().tick(250);
+
+    expect(component.isWorkTime()).toBeTrue();
+    expect(component.timeLeft()).toBe(22 * 60);
+    expect(component.isRunning()).toBeTrue();
+  });
+
+  it('should synchronize from the deadline when the document becomes visible', () => {
+    jasmine.clock().install();
+    let now = 1_000;
+    spyOn(Date, 'now').and.callFake(() => now);
+    spyOnProperty(document, 'hidden', 'get').and.returnValue(false);
+    component.startTimer();
+
+    now += 2 * 60 * 1000;
+    document.dispatchEvent(new Event('visibilitychange'));
+
+    expect(component.timeLeft()).toBe(component.workTime() - 2 * 60);
+  });
+
+  it('should stop refreshing the countdown when Angular destroys the component', () => {
+    jasmine.clock().install();
+    let now = 1_000;
+    spyOn(Date, 'now').and.callFake(() => now);
+    component.startTimer();
+    const destroyedComponent = component;
+
+    fixture.destroy();
+    now += 5_000;
+    jasmine.clock().tick(5_000);
+
+    expect(destroyedComponent.timeLeft()).toBe(destroyedComponent.workTime());
+
+    fixture = TestBed.createComponent(PomodoroComponent);
+    component = fixture.componentInstance;
+  });
+
+  it('should restore and synchronize a running timer after the component is recreated', () => {
+    jasmine.clock().install();
+    let now = 1_000;
+    spyOn(Date, 'now').and.callFake(() => now);
+    component.startTimer();
+    fixture.destroy();
+
+    now += 3 * 60 * 1000;
+    fixture = TestBed.createComponent(PomodoroComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.isRunning()).toBeTrue();
+    expect(component.timeLeft()).toBe(component.workTime() - 3 * 60);
+  });
+
+  it('should restore a paused timer after the component is recreated', () => {
+    component.selectMode('custom');
+    component.increaseDuration('work');
+    component.timeLeft.set(12 * 60);
+    component.startTimer();
+    component.pauseTimer();
+    fixture.destroy();
+
+    const restoredFixture = TestBed.createComponent(PomodoroComponent);
+    fixture = restoredFixture;
+    component = restoredFixture.componentInstance;
+
+    expect(component.currentMode()).toBe('custom');
+    expect(component.workTime()).toBe(26 * 60);
+    expect(component.timeLeft()).toBe(12 * 60);
+    expect(component.isRunning()).toBeFalse();
   });
 
   it('should refresh the rendered countdown after an asynchronous timer tick', async () => {
@@ -110,13 +209,16 @@ describe('PomodoroComponent', () => {
 
   it('should continue running with the custom break duration when the work session ends', () => {
     jasmine.clock().install();
+    let now = 1_000;
+    spyOn(Date, 'now').and.callFake(() => now);
     component.selectMode('custom');
     component.increaseDuration('break');
     component.increaseDuration('break');
+    component.timeLeft.set(1);
     component.startTimer();
-    component.timeLeft.set(0);
 
-    jasmine.clock().tick(1000);
+    now += 1_000;
+    jasmine.clock().tick(250);
 
     expect(component.isWorkTime()).toBeFalse();
     expect(component.breakTime()).toBe(7 * 60);

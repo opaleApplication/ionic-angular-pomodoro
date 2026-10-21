@@ -1,6 +1,4 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-
-import { NativeAudio } from '@capgo/native-audio';
+import { Component, DestroyRef, HostListener, OnInit, computed, inject, signal } from '@angular/core';
 
 import {
   IonButton,
@@ -24,9 +22,16 @@ import { addIcons } from 'ionicons';
 import { add, pause, play, removeOutline, stop } from 'ionicons/icons';
 
 import { I18nService } from '../../core/i18n.service';
+import { AppLifecycleService } from '../../core/app-lifecycle.service';
+import { PomodoroAudioService } from '../../core/pomodoro-audio.service';
+import { PomodoroNotificationService } from '../../core/pomodoro-notification.service';
+import { PomodoroPersistenceService } from '../../core/pomodoro-persistence.service';
+import type {
+  PersistedPomodoroState,
+  PomodoroMode,
+  SessionPhase,
+} from '../../core/pomodoro-state';
 
-type PomodoroMode = 'focus' | 'relax' | 'custom';
-type SessionPhase = 'work' | 'break';
 type TomatoLayerKey = 'green' | 'yellow' | 'red';
 
 @Component({
@@ -52,7 +57,7 @@ type TomatoLayerKey = 'green' | 'yellow' | 'red';
   ],
   standalone: true,
 })
-export class PomodoroComponent implements OnInit, OnDestroy {
+export class PomodoroComponent implements OnInit {
   readonly i18n = inject(I18nService);
   readonly modes: readonly PomodoroMode[] = ['focus', 'relax', 'custom'];
   readonly customPhases: readonly SessionPhase[] = ['work', 'break'];
@@ -69,37 +74,48 @@ export class PomodoroComponent implements OnInit, OnDestroy {
   readonly isRunning = signal(false);
   readonly currentMode = signal<PomodoroMode>('relax');
   readonly isCustomMode = computed(() => this.currentMode() === 'custom');
-  userInteracted = false;
 
   private readonly minute = 60;
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly appLifecycle = inject(AppLifecycleService);
+  private readonly audio = inject(PomodoroAudioService);
+  private readonly notifications = inject(PomodoroNotificationService);
+  private readonly persistence = inject(PomodoroPersistenceService);
   private readonly presets: Record<Exclude<PomodoroMode, 'custom'>, { work: number; break: number }> = {
     focus: { work: 50 * 60, break: 10 * 60 },
     relax: { work: 25 * 60, break: 5 * 60 },
   };
 
   private interval: ReturnType<typeof setInterval> | undefined;
-  private soundsLoaded = false;
+  private deadlineMs: number | undefined;
   private customWorkTime = this.workTime();
   private customBreakTime = this.breakTime();
-  private readonly handleFirstInteraction = () => {
-    if (!this.soundsLoaded) {
-      this.preloadSounds();
-    }
-    this.userInteracted = true;
-  };
 
   constructor() {
     addIcons({ add, play, pause, stop, removeOutline });
+    this.restoreState();
     this.preloadSounds();
+    this.destroyRef.onDestroy(() => this.clearTimer());
   }
 
   ngOnInit(): void {
-    document.addEventListener('click', this.handleFirstInteraction, { once: true });
+    void this.appLifecycle.synchronizeOnNativeResume(
+      () => this.syncCountdown(),
+      this.destroyRef,
+    );
+
+    if (this.isRunning()) {
+      this.syncCountdown();
+      this.startCountdownInterval();
+      void this.scheduleDeadlineNotification(false);
+    }
   }
 
-  ngOnDestroy(): void {
-    this.clearTimer();
-    document.removeEventListener('click', this.handleFirstInteraction);
+  @HostListener('document:visibilitychange')
+  protected onVisibilityChange(): void {
+    if (!document.hidden) {
+      this.syncCountdown();
+    }
   }
 
   get appTitle(): string {
@@ -165,27 +181,11 @@ export class PomodoroComponent implements OnInit, OnDestroy {
   }
 
   preloadSounds(): void {
-    if (this.soundsLoaded) {
-      return;
-    }
-
-    void NativeAudio.preload({
-      assetId: 'work_sound',
-      assetPath: 'assets/sounds/work_sound.mp3',
-      audioChannelNum: 1,
-      isUrl: false,
-    })
-      .then(() => {
-        this.soundsLoaded = true;
-      })
-      .catch((error) => {
-        if (typeof error === 'string' && error.includes('AssetId already exists')) {
-          this.soundsLoaded = true;
-          return;
-        }
-
-        console.warn(this.i18n.t('pomodoro.audio.preloadError'), error);
-      });
+    void this.audio.preload().then(loaded => {
+      if (!loaded) {
+        console.warn(this.i18n.t('pomodoro.audio.preloadError'));
+      }
+    });
   }
 
   startTimer(): void {
@@ -193,15 +193,12 @@ export class PomodoroComponent implements OnInit, OnDestroy {
       return;
     }
 
+    this.registerUserInteraction();
+    this.deadlineMs = Date.now() + this.timeLeft() * 1000;
     this.isRunning.set(true);
-    this.interval = setInterval(() => {
-      if (this.timeLeft() > 0) {
-        this.timeLeft.update(seconds => seconds - 1);
-        return;
-      }
-
-      this.toggleTimer();
-    }, 1000);
+    this.startCountdownInterval();
+    this.persistState();
+    void this.scheduleDeadlineNotification(true);
   }
 
   pauseTimer(): void {
@@ -209,14 +206,19 @@ export class PomodoroComponent implements OnInit, OnDestroy {
       return;
     }
 
+    this.syncCountdown();
     this.isRunning.set(false);
     this.clearTimer();
+    this.persistState();
+    void this.cancelDeadlineNotification();
   }
 
   stopTimer(): void {
     this.isRunning.set(false);
     this.clearTimer();
     this.timeLeft.set(this.getDurationForCurrentPhase());
+    this.persistState();
+    void this.cancelDeadlineNotification();
   }
 
   toggleTimer(): void {
@@ -226,6 +228,7 @@ export class PomodoroComponent implements OnInit, OnDestroy {
     this.isRunning.set(false);
     this.isWorkTime.update(isWorkTime => !isWorkTime);
     this.timeLeft.set(this.getDurationForCurrentPhase());
+    void this.cancelDeadlineNotification();
 
     if (!this.isWorkTime()) {
       this.playSound('work_sound');
@@ -233,17 +236,18 @@ export class PomodoroComponent implements OnInit, OnDestroy {
 
     if (shouldResume) {
       this.startTimer();
+    } else {
+      this.persistState();
     }
   }
 
   playSound(assetId: string): void {
-    if (!this.userInteracted) {
-      console.warn(this.i18n.t('pomodoro.audio.interactionRequired'));
-      return;
-    }
-
-    void NativeAudio.play({ assetId }).catch((error) => {
-      console.warn(this.i18n.t('pomodoro.audio.playError'), error);
+    void this.audio.play(assetId).then(result => {
+      if (result === 'interaction-required') {
+        console.warn(this.i18n.t('pomodoro.audio.interactionRequired'));
+      } else if (result === 'failed') {
+        console.warn(this.i18n.t('pomodoro.audio.playError'));
+      }
     });
   }
 
@@ -304,6 +308,8 @@ export class PomodoroComponent implements OnInit, OnDestroy {
     this.clearTimer();
     this.isWorkTime.set(true);
     this.timeLeft.set(this.workTime());
+    this.persistState();
+    void this.cancelDeadlineNotification();
   }
 
   private getPhaseDuration(phase: SessionPhase): number {
@@ -311,6 +317,10 @@ export class PomodoroComponent implements OnInit, OnDestroy {
   }
 
   private updateCustomDuration(phase: SessionPhase, delta: number): void {
+    if (this.isRunning()) {
+      this.syncCountdown();
+    }
+
     const currentDuration = phase === 'work' ? this.customWorkTime : this.customBreakTime;
     const nextDuration = Math.max(this.minute, currentDuration + delta);
 
@@ -328,17 +338,23 @@ export class PomodoroComponent implements OnInit, OnDestroy {
 
     const isCurrentPhase = (phase === 'work') === this.isWorkTime();
     if (!isCurrentPhase) {
+      this.persistState();
       return;
     }
 
     if (!this.isRunning()) {
       this.timeLeft.set(nextDuration);
+      this.persistState();
       return;
     }
 
     if (this.timeLeft() > nextDuration) {
       this.timeLeft.set(nextDuration);
     }
+
+    this.deadlineMs = Date.now() + this.timeLeft() * 1000;
+    this.persistState();
+    void this.scheduleDeadlineNotification(false);
   }
 
   private getDurationForCurrentPhase(): number {
@@ -350,12 +366,128 @@ export class PomodoroComponent implements OnInit, OnDestroy {
   }
 
   private clearTimer(): void {
-    if (!this.interval) {
+    if (this.interval !== undefined) {
+      clearInterval(this.interval);
+      this.interval = undefined;
+    }
+
+    this.deadlineMs = undefined;
+  }
+
+  private startCountdownInterval(): void {
+    if (this.interval !== undefined) {
+      clearInterval(this.interval);
+    }
+
+    this.interval = setInterval(() => {
+      this.syncCountdown();
+    }, 250);
+  }
+
+  private registerUserInteraction(): void {
+    this.audio.registerUserInteraction();
+  }
+
+  private syncCountdown(): void {
+    if (!this.isRunning() || this.deadlineMs === undefined) {
       return;
     }
 
-    clearInterval(this.interval);
-    this.interval = undefined;
+    const now = Date.now();
+    if (now >= this.deadlineMs) {
+      this.catchUpExpiredPhases(now);
+    }
+
+    const remaining = Math.max(0, Math.ceil((this.deadlineMs - now) / 1000));
+    this.timeLeft.set(remaining);
+  }
+
+  private catchUpExpiredPhases(now: number): void {
+    if (this.deadlineMs === undefined) {
+      return;
+    }
+
+    const nextPhaseIsWork = !this.isWorkTime();
+    const cycleDurationMs = (this.workTime() + this.breakTime()) * 1000;
+    const elapsedAfterDeadlineMs = now - this.deadlineMs;
+    const completedCycles = Math.floor(elapsedAfterDeadlineMs / cycleDurationMs);
+    let phaseStartMs = this.deadlineMs + completedCycles * cycleDurationMs;
+    let activePhaseIsWork = nextPhaseIsWork;
+    let activePhaseDurationMs = this.getPhaseDuration(activePhaseIsWork ? 'work' : 'break') * 1000;
+
+    if (now >= phaseStartMs + activePhaseDurationMs) {
+      phaseStartMs += activePhaseDurationMs;
+      activePhaseIsWork = !activePhaseIsWork;
+      activePhaseDurationMs = this.getPhaseDuration(activePhaseIsWork ? 'work' : 'break') * 1000;
+    }
+
+    this.isWorkTime.set(activePhaseIsWork);
+    this.deadlineMs = phaseStartMs + activePhaseDurationMs;
+    this.persistState();
+    void this.scheduleDeadlineNotification(false);
+
+    if (!activePhaseIsWork) {
+      this.playSound('work_sound');
+    }
+  }
+
+  private async scheduleDeadlineNotification(requestPermission: boolean): Promise<void> {
+    if (this.deadlineMs === undefined) {
+      return;
+    }
+
+    const completedPhase: SessionPhase = this.isWorkTime() ? 'work' : 'break';
+    const scheduled = await this.notifications.schedule({
+      deadlineMs: this.deadlineMs,
+      title: this.appTitle,
+      body: this.i18n.t(`pomodoro.notification.${completedPhase}`),
+      requestPermission,
+    });
+    if (!scheduled) {
+      console.warn(this.i18n.t('pomodoro.notification.scheduleError'));
+    }
+  }
+
+  private async cancelDeadlineNotification(): Promise<void> {
+    const cancelled = await this.notifications.cancel();
+    if (!cancelled) {
+      console.warn(this.i18n.t('pomodoro.notification.cancelError'));
+    }
+  }
+
+  private persistState(): void {
+    const state: PersistedPomodoroState = {
+      mode: this.currentMode(),
+      workTime: this.workTime(),
+      breakTime: this.breakTime(),
+      customWorkTime: this.customWorkTime,
+      customBreakTime: this.customBreakTime,
+      timeLeft: this.timeLeft(),
+      isWorkTime: this.isWorkTime(),
+      isRunning: this.isRunning(),
+      ...(this.deadlineMs === undefined ? {} : { deadlineMs: this.deadlineMs }),
+    };
+
+    if (!this.persistence.save(state)) {
+      console.warn(this.i18n.t('pomodoro.persistence.saveError'));
+    }
+  }
+
+  private restoreState(): void {
+    const state = this.persistence.load();
+    if (!state) {
+      return;
+    }
+
+    this.currentMode.set(state.mode);
+    this.workTime.set(state.workTime);
+    this.breakTime.set(state.breakTime);
+    this.customWorkTime = state.customWorkTime;
+    this.customBreakTime = state.customBreakTime;
+    this.timeLeft.set(state.timeLeft);
+    this.isWorkTime.set(state.isWorkTime);
+    this.isRunning.set(state.isRunning);
+    this.deadlineMs = state.isRunning ? state.deadlineMs : undefined;
   }
 
   private clamp(value: number, min = 0, max = 1): number {

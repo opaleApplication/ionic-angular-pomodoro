@@ -1,8 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { NativeAudio } from '@capgo/native-audio';
-
 import { I18nService } from '../core/i18n.service';
+import { PomodoroAudioService } from '../core/pomodoro-audio.service';
 import { HomePage } from './home.page';
 import { i18nTestingStub } from '../../testing/i18n-test.stub';
 
@@ -11,12 +10,19 @@ describe('HomePage', () => {
   let fixture: ComponentFixture<HomePage>;
 
   beforeEach(async () => {
-    spyOn(NativeAudio, 'preload').and.returnValue(Promise.resolve());
-    spyOn(NativeAudio, 'play').and.returnValue(Promise.resolve());
-
     await TestBed.configureTestingModule({
       imports: [HomePage],
-      providers: [{ provide: I18nService, useValue: i18nTestingStub }],
+      providers: [
+        { provide: I18nService, useValue: i18nTestingStub },
+        {
+          provide: PomodoroAudioService,
+          useValue: {
+            preload: () => Promise.resolve(true),
+            registerUserInteraction: () => undefined,
+            play: () => Promise.resolve('played'),
+          },
+        },
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(HomePage);

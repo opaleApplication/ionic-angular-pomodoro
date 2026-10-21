@@ -18,5 +18,10 @@
   "pomodoro.note": "Changer de mode relance une session de travail avec la duree choisie.",
   "pomodoro.audio.interactionRequired": "L'utilisateur doit interagir avec la page avant de jouer un son.",
   "pomodoro.audio.preloadError": "Le son n'a pas pu être charge :",
-  "pomodoro.audio.playError": "Le son n'a pas pu être joue :"
+  "pomodoro.audio.playError": "Le son n'a pas pu être joue :",
+  "pomodoro.notification.work": "Session de concentration terminée. Place à la pause.",
+  "pomodoro.notification.break": "Pause terminée. Place à la concentration.",
+  "pomodoro.notification.scheduleError": "La notification n'a pas pu être programmée :",
+  "pomodoro.notification.cancelError": "La notification n'a pas pu être annulée :",
+  "pomodoro.persistence.saveError": "L'état du minuteur n'a pas pu être enregistré :"
 }
