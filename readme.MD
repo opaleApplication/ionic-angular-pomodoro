@@ -30,7 +30,7 @@ developers getting started with this stack.
 
 ## Requirements
 
-- Node.js **22.23.3**, the version pinned in `.nvmrc` and used by CI
+- Node.js **22.23.4**, the version pinned in `.nvmrc` and used by CI
 - npm, included with Node.js
 - Google Chrome to run the Karma tests
 
@@ -49,8 +49,8 @@ After cloning the repository, open a terminal in its root directory.
 If you use nvm or nvm-windows, install and activate the pinned Node.js version:
 
 ```bash
-nvm install 22.23.3
-nvm use 22.23.3
+nvm install 22.23.4
+nvm use 22.23.4
 ```
 
 On Windows, nvm may request administrator permission to switch Node.js versions.
